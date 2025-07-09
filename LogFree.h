@@ -74,6 +74,16 @@ struct LogInfo
         showInCmd = false;
         logTimeStamp.ResetTime();
     }
+    //深克隆
+    LogInfo(const LogInfo& logger)
+    {
+        logBuff = new char[logger.logBuffSize];
+        logBuffSize = logger.logBuffSize;
+        memcpy(logBuff, logger.logBuff, logBuffSize);
+        level = logger.level;
+        showInCmd = logger.showInCmd;
+        logTimeStamp = logger.logTimeStamp;
+    }
     LogInfo(const std::string& strLog, LogLevel logLevel = LogLevel::INFO, bool logShowInCmd = false)
     {
         logBuff = new char[strLog.size()];
@@ -89,16 +99,6 @@ struct LogInfo
         {
             delete[] logBuff;
         }
-    }
-    //深克隆
-    void DeepClone(const LogInfo& logger)
-    {
-        logBuff = new char[logger.logBuffSize];
-        logBuffSize = logger.logBuffSize;
-        memcpy(logBuff, logger.logBuff, logBuffSize);
-        level = logger.level;
-        showInCmd = logger.showInCmd;
-        logTimeStamp = logger.logTimeStamp;
     }
 };
 
@@ -170,9 +170,10 @@ int LogFree::Log(const std::string& strLog, LogLevel level, bool showInCmd)
 
 void LogFree::LogThread()
 {
+    std::unique_ptr<LogInfo> logger;
     while (m_bRunning)
     {
-        std::unique_ptr<LogInfo> logger;
+        logger.release();
         //线程锁范围限定
         {
             std::unique_lock<std::mutex> lock(m_mutexLog);
