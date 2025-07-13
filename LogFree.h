@@ -117,7 +117,6 @@ private:
     LogFree()
     {
         m_fileLog = nullptr;
-        m_timeToday.ResetTime();
         ResetLogFile();
         m_bRunning = true;
         std::thread th(&LogFree::LogThread, this);
@@ -160,9 +159,10 @@ private:
 int LogFree::Log(const std::string& strLog, LogLevel level, bool showInCmd)
 {
     //LogInfo *logger = new LogInfo(strLog, level, showInCmd);
+    std::unique_ptr<LogInfo> logPtr = std::make_unique<LogInfo>(strLog, level, showInCmd);
     {
         std::unique_lock<std::mutex> lock(getInstance()->m_mutexLog);
-        getInstance()->m_queLogInfo.push(std::make_unique<LogInfo>(strLog, level, showInCmd));
+        getInstance()->m_queLogInfo.push(std::move(logPtr));
     }
     getInstance()->m_Condition.notify_all();
     return 0;
