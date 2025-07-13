@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <chrono>
 #include <windows.h>
+#include "ThreadPool.h"
 
 enum LogLevel
 {
@@ -143,10 +144,12 @@ private:
     }
     //创建一个今日日期的log文件
     void ResetLogFile();
-
+    //log处理线程
     void LogThread();
-
+    //log数据写入
     void LogHandle(std::unique_ptr<LogInfo> logger);
+    //log存入队列
+    void LogPush(std::unique_ptr<LogInfo> logPtr);
 
     std::queue<std::unique_ptr<LogInfo>> m_queLogInfo;
     std::mutex m_mutexLog;
@@ -154,21 +157,22 @@ private:
     bool m_bRunning;
     std::ofstream* m_fileLog;
     LogTime m_timeToday;
+    ThreadPool m_logThreadPool;
 };
 
-int LogFree::Log(const std::string& strLog, LogLevel level, bool showInCmd)
+inline int LogFree::Log(const std::string& strLog, LogLevel level, bool showInCmd)
 {
-    //LogInfo *logger = new LogInfo(strLog, level, showInCmd);
     std::unique_ptr<LogInfo> logPtr = std::make_unique<LogInfo>(strLog, level, showInCmd);
+    //使用线程池无阻塞存入log队列
+    auto task = [ptr = std::move(logPtr)]() mutable
     {
-        std::unique_lock<std::mutex> lock(getInstance()->m_mutexLog);
-        getInstance()->m_queLogInfo.push(std::move(logPtr));
-    }
-    getInstance()->m_Condition.notify_all();
+        getInstance()->LogPush(std::move(ptr));
+    };
+    getInstance()->m_logThreadPool.PushThread(std::move(task));
     return 0;
 }
 
-void LogFree::LogThread()
+inline void LogFree::LogThread()
 {
     std::unique_ptr<LogInfo> logger;
     while (m_bRunning)
@@ -197,7 +201,7 @@ void LogFree::LogThread()
     }
 }
 
-void LogFree::LogHandle(std::unique_ptr<LogInfo> logger)
+inline void LogFree::LogHandle(std::unique_ptr<LogInfo> logger)
 {
     if (!logger.get()->logTimeStamp.IsToday())
     {
@@ -234,7 +238,17 @@ void LogFree::LogHandle(std::unique_ptr<LogInfo> logger)
     }
 }
 
-void LogFree::ResetLogFile()
+inline void LogFree::LogPush(std::unique_ptr<LogInfo> logPtr)
+{
+    //限制锁的作用域，不影响notify
+    {
+        std::unique_lock<std::mutex> lock(getInstance()->m_mutexLog);
+        getInstance()->m_queLogInfo.push(std::move(logPtr));
+    }
+    getInstance()->m_Condition.notify_all();
+}
+
+inline void LogFree::ResetLogFile()
 {
     m_timeToday.ResetTime();
     std::stringstream ss;
