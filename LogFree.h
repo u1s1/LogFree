@@ -148,8 +148,6 @@ private:
     void LogThread();
     //log数据写入
     void LogHandle(std::unique_ptr<LogInfo> logger);
-    //log存入队列
-    void LogPush(std::unique_ptr<LogInfo> logPtr);
 
     std::queue<std::unique_ptr<LogInfo>> m_queLogInfo;
     std::mutex m_mutexLog;
@@ -163,12 +161,12 @@ private:
 inline int LogFree::Log(const std::string& strLog, LogLevel level, bool showInCmd)
 {
     std::unique_ptr<LogInfo> logPtr = std::make_unique<LogInfo>(strLog, level, showInCmd);
-    //使用线程池无阻塞存入log队列
-    auto task = [ptr = std::move(logPtr)]() mutable
+    //限制锁的作用域，不影响notify
     {
-        getInstance()->LogPush(std::move(ptr));
-    };
-    getInstance()->m_logThreadPool.PushThread(std::move(task));
+        std::unique_lock<std::mutex> lock(getInstance()->m_mutexLog);
+        getInstance()->m_queLogInfo.push(std::move(logPtr));
+    }
+    getInstance()->m_Condition.notify_all();
     return 0;
 }
 
@@ -236,16 +234,6 @@ inline void LogFree::LogHandle(std::unique_ptr<LogInfo> logger)
     {
         std::cout << strLog;
     }
-}
-
-inline void LogFree::LogPush(std::unique_ptr<LogInfo> logPtr)
-{
-    //限制锁的作用域，不影响notify
-    {
-        std::unique_lock<std::mutex> lock(getInstance()->m_mutexLog);
-        getInstance()->m_queLogInfo.push(std::move(logPtr));
-    }
-    getInstance()->m_Condition.notify_all();
 }
 
 inline void LogFree::ResetLogFile()
