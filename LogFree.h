@@ -116,14 +116,17 @@ private:
 
     LogFree()
     {
+#ifdef _LOG_OUT
         m_fileLog = nullptr;
         ResetLogFile();
         m_bRunning = true;
         std::thread th(&LogFree::LogThread, this);
         th.detach();
+#endif
     }
     ~LogFree()
     {
+#ifdef _LOG_OUT
         {
             std::unique_lock<std::mutex> lock(m_mutexLog);
             m_bRunning = false;
@@ -140,6 +143,7 @@ private:
             delete m_fileLog;
             m_fileLog = nullptr;
         }
+#endif
     }
     //创建一个今日日期的log文件
     void ResetLogFile();
@@ -158,6 +162,7 @@ private:
 
 inline int LogFree::Log(const std::string& strLog, LogLevel level, bool showInCmd)
 {
+#ifdef _LOG_OUT
     std::unique_ptr<LogInfo> logPtr = std::make_unique<LogInfo>(strLog, level, showInCmd);
     //限制锁的作用域，不影响notify
     {
@@ -165,6 +170,7 @@ inline int LogFree::Log(const std::string& strLog, LogLevel level, bool showInCm
         getInstance()->m_queLogInfo.push(std::move(logPtr));
     }
     getInstance()->m_Condition.notify_all();
+#endif
     return 0;
 }
 
