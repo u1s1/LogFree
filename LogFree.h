@@ -10,7 +10,6 @@
 #include <iomanip>
 #include <chrono>
 #include <windows.h>
-#include "ThreadPool.h"
 
 enum LogLevel
 {
@@ -155,7 +154,6 @@ private:
     bool m_bRunning;
     std::ofstream* m_fileLog;
     LogTime m_timeToday;
-    ThreadPool m_logThreadPool;
 };
 
 inline int LogFree::Log(const std::string& strLog, LogLevel level, bool showInCmd)
