@@ -105,7 +105,12 @@ struct LogInfo
 class LogFree
 {
 public:
+    //输出日志
     static int Log(const std::string& strLog, LogLevel level = LogLevel::INFO, bool showInCmd = false);
+
+    //输出日志及对应代码行等信息
+#define LogCodeInfo(strLog, ...) Log("[" + std::string(__FILE__) + ":" + std::to_string(__LINE__) + "][" \
+                    + std::string(__FUNCTION__) + "]" + strLog, ##__VA_ARGS__)
 
 private:
     static LogFree *getInstance()
